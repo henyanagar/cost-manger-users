@@ -1,9 +1,9 @@
+// Schema for users collection
+// Stores user information
 const mongoose = require('mongoose');
 
-// Schema for User as per project requirements
 const userSchema = new mongoose.Schema({
-    // The id property is a Number, distinct from MongoDB's _id
-    id: {
+     id: {
         type: Number,
         required: true,
         unique: true
@@ -20,7 +20,9 @@ const userSchema = new mongoose.Schema({
         type: Date,
         required: true
     }
-}, { versionKey: false });
+}, {
+    versionKey: false,
+    collection: 'users'
+});
 
-// Exporting the User model
-module.exports = mongoose.model('User', userSchema, 'users');
+module.exports = mongoose.model('User', userSchema);
