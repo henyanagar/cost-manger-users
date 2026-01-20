@@ -4,6 +4,8 @@ const router = express.Router();
 const User = require('../models/user');
 const Cost = require('../models/cost');
 const { pino } = require('../middlewares/logger');
+const { validateUserId, validateBirthday } = require('../utils/validators');
+const { formatIsraeliDate } = require('../utils/dateHelper');
 
 // GET /api/users - get all users
 router.get('/users', async (req, res) => {
@@ -24,17 +26,19 @@ router.get('/users', async (req, res) => {
 // GET /api/users/:id - get specific user with total costs
 router.get('/users/:id', async (req, res) => {
     try {
-        const userId = Number(req.params.id);
-        pino.info(`Accessing GET /api/users/${userId} endpoint`);
+        pino.info(`Accessing GET /api/users/${req.params.id} endpoint`);
 
-        // Validate ID is a number
-        if (!Number.isInteger(userId)) {
+        // Validate user ID
+        const idValidation = validateUserId(req.params.id);
+        if (!idValidation.isValid) {
             res.locals.errorId = 'INVALID_ID';
             return res.status(400).json({
                 id: 'INVALID_ID',
-                message: 'User ID must be a valid integer'
+                message: idValidation.error
             });
         }
+
+        const userId = idValidation.value;
 
         // Find user in database
         const user = await User.findOne({ id: userId });
@@ -81,21 +85,34 @@ router.post('/add', async (req, res) => {
             });
         }
 
-        const userId = Number(id);
-
-        // Validate ID is a number
-        if (!Number.isInteger(userId)) {
+        // Validate user ID
+        const idValidation = validateUserId(id);
+        if (!idValidation.isValid) {
             res.locals.errorId = 'INVALID_ID';
             return res.status(400).json({
                 id: 'INVALID_ID',
-                message: 'User ID must be a valid integer'
+                message: idValidation.error
             });
         }
 
+        const userId = idValidation.value;
+
+        // Validate birthday
+        const birthdayValidation = validateBirthday(birthday);
+        if (!birthdayValidation.isValid) {
+            res.locals.errorId = 'INVALID_DATE_FORMAT';
+            return res.status(400).json({
+                id: 'INVALID_DATE_FORMAT',
+                message: birthdayValidation.error
+            });
+        }
+
+        const validatedDate = birthdayValidation.date;
+
         // Check if user already exists
-        const exists = await User.findOne({ id: userId });
-        if (exists) {
-            res.locals.errorId = `USER_EXISTS`;
+        const existingUser = await User.findOne({ id: userId });
+        if (existingUser) {
+            res.locals.errorId = 'USER_EXISTS';
             return res.status(400).json({
                 id: 'USER_EXISTS',
                 message: `User with ID ${userId} already exists`
@@ -105,13 +122,20 @@ router.post('/add', async (req, res) => {
         // Create new user
         const newUser = await User.create({
             id: userId,
-            first_name: first_name,
-            last_name: last_name,
-            birthday: new Date(birthday)
+            first_name: first_name.trim(),
+            last_name: last_name.trim(),
+            birthday: validatedDate
         });
 
         pino.info(`User ${userId} created successfully`);
-        res.status(201).json(newUser);
+
+        // Return user data with birthday in Israeli format
+        res.status(201).json({
+            id: newUser.id,
+            first_name: newUser.first_name,
+            last_name: newUser.last_name,
+            birthday: formatIsraeliDate(newUser.birthday)
+        });
 
     } catch (err) {
         pino.error(`Error adding user: ${err.message}`);
