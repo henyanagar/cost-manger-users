@@ -1,9 +1,9 @@
 // Schema for users collection
-// Stores user information
+// Stores user information as per project requirements
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-     id: {
+    id: {
         type: Number,
         required: true,
         unique: true

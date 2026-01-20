@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
+const Cost = require('../models/cost');
 const { pino } = require('../middlewares/logger');
 
 // GET /api/users - get all users
@@ -28,6 +29,7 @@ router.get('/users/:id', async (req, res) => {
 
         // Validate ID is a number
         if (!Number.isInteger(userId)) {
+            res.locals.errorId = 'INVALID_ID';
             return res.status(400).json({
                 id: 'INVALID_ID',
                 message: 'User ID must be a valid integer'
@@ -37,26 +39,16 @@ router.get('/users/:id', async (req, res) => {
         // Find user in database
         const user = await User.findOne({ id: userId });
         if (!user) {
+            res.locals.errorId = 'USER_NOT_FOUND';
             return res.status(404).json({
                 id: 'USER_NOT_FOUND',
                 message: 'User not found'
             });
         }
 
-        // Get total costs from costs service
-        let total = 0;
-        try {
-            const costApiUrl = process.env.COST_API_URL;
-            const response = await fetch(`${costApiUrl}/api/report?userid=${userId}`);
-
-            if (response.ok) {
-                const result = await response.json();
-                total = result.total || 0;
-            }
-        } catch (err) {
-            // If costs service fails, continue with total = 0
-            pino.error(`Failed to get total costs for user ${userId}: ${err.message}`);
-        }
+        // Calculate total costs directly from database
+        const costs = await Cost.find({ userid: userId });
+        const total = costs.reduce((sum, cost) => sum + cost.sum, 0);
 
         res.json({
             first_name: user.first_name,
@@ -82,6 +74,7 @@ router.post('/add', async (req, res) => {
 
         // Validate required fields
         if (!id || !first_name || !last_name || !birthday) {
+            res.locals.errorId = 'VALIDATION_ERROR';
             return res.status(400).json({
                 id: 'VALIDATION_ERROR',
                 message: 'Missing required fields: id, first_name, last_name, birthday'
@@ -92,6 +85,7 @@ router.post('/add', async (req, res) => {
 
         // Validate ID is a number
         if (!Number.isInteger(userId)) {
+            res.locals.errorId = 'INVALID_ID';
             return res.status(400).json({
                 id: 'INVALID_ID',
                 message: 'User ID must be a valid integer'
@@ -101,9 +95,10 @@ router.post('/add', async (req, res) => {
         // Check if user already exists
         const exists = await User.findOne({ id: userId });
         if (exists) {
+            res.locals.errorId = `USER_EXISTS`;
             return res.status(400).json({
                 id: 'USER_EXISTS',
-                message: 'User with this ID already exists'
+                message: `User with ID ${userId} already exists`
             });
         }
 

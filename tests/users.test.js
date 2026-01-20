@@ -1,10 +1,14 @@
 // Unit tests for users service
 const request = require('supertest');
-const app = require('../app'); // ← Import app.js, NOT server.js
+const app = require('../app');
 
 // Mock the User model
 const User = require('../models/user');
 jest.mock('../models/user');
+
+// Mock the Cost model
+const Cost = require('../models/cost');
+jest.mock('../models/cost');
 
 // Mock fetch for external API calls
 global.fetch = jest.fn();
@@ -57,7 +61,7 @@ describe('Users API', () => {
     });
 
     // Test GET /api/users/:id
-    test('GET /api/users/123123 should return user details', async () => {
+    test('GET /api/users/123123 should return user details with total', async () => {
         User.findOne.mockResolvedValue({
             id: 123123,
             first_name: 'mosh',
@@ -65,16 +69,18 @@ describe('Users API', () => {
             birthday: new Date('1990-01-01')
         });
 
-        // Mock fetch to costs service
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => ({ total: 100 })
-        });
+        // Mock Cost.find to return costs for total calculation
+        Cost.find.mockResolvedValue([
+            { sum: 50 },
+            { sum: 30 },
+            { sum: 20 }
+        ]);
 
         const response = await request(app).get('/api/users/123123');
         expect(response.status).toBe(200);
         expect(response.body).toHaveProperty('first_name');
         expect(response.body).toHaveProperty('total');
+        expect(response.body.total).toBe(100);
     });
 
     // Test validation
