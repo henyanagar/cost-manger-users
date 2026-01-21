@@ -26,14 +26,14 @@ describe('Users API', () => {
             id: 999999,
             first_name: 'Test',
             last_name: 'User',
-            birthday: new Date('1990-01-01')
+            birthday: new Date(Date.UTC(1990, 0, 1))
         });
 
         const newUser = {
             id: 999999,
             first_name: 'Test',
             last_name: 'User',
-            birthday: '1990-01-01'
+            birthday: '01/01/1990'  // ✅ CORRECT FORMAT
         };
 
         const response = await request(app)
@@ -42,6 +42,7 @@ describe('Users API', () => {
 
         expect(response.status).toBe(201);
         expect(response.body.id).toBe(999999);
+        expect(response.body.birthday).toBe('01/01/1990');
     });
 
     // Test GET /api/users
@@ -106,9 +107,39 @@ describe('Users API', () => {
                 id: 123123,
                 first_name: 'Test',
                 last_name: 'User',
-                birthday: '1990-01-01'
+                birthday: '01/01/1990'  // ✅ CORRECT FORMAT
             });
 
         expect(response.status).toBe(400);
+    });
+
+    // Test invalid birthday format
+    test('POST /api/add should fail with invalid birthday format', async () => {
+        const response = await request(app)
+            .post('/api/add')
+            .send({
+                id: 888888,
+                first_name: 'Test',
+                last_name: 'User',
+                birthday: '1990-01-01'  // ❌ Wrong format
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_DATE_FORMAT');
+    });
+
+    // Test future birthday
+    test('POST /api/add should fail with future birthday', async () => {
+        const response = await request(app)
+            .post('/api/add')
+            .send({
+                id: 888888,
+                first_name: 'Test',
+                last_name: 'User',
+                birthday: '01/01/2050'  // Future date
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.id).toBe('INVALID_DATE_FORMAT');
     });
 });
